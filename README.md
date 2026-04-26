@@ -8,12 +8,20 @@ A minimalist python asynchronous IRC server built on top of
 
 Download and install the latest stable version using pip.
 Windows users might replace `python3` by `py`.
-
-    python3 -m pip install aioircd
+```bash
+python3 -m pip install aioircd
+```
 
 Then run the server:
-
-    HOST=0.0.0.0 LOGLEVEL=INFO python3 -m aioircd
+```bash
+HOST=0.0.0.0 LOGLEVEL=INFO python3 -m aioircd
+```
+If you are using powershell you can use the following command:
+```powershell
+$env:HOST="0.0.0.0"
+$env:LOGLEVEL="INFO"
+python -m aioircd
+```
 
 The configuration is done via environment variables, see `--help`:
 
