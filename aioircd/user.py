@@ -46,6 +46,7 @@ class User:
         self._nursery = nursery
         self._nick = None
         self._addr = stream.socket.getpeername()
+        self._realname = None
         self.state = None
         self.state = (PasswordState if servlocal.pwd else ConnectedState)(self)
         self.channels = set()
@@ -64,12 +65,28 @@ class User:
     @property
     def nick(self):
         return self._nick
+    
+    @property
+    def addr(self):
+        return self._addr
+    
+    @property
+    def host(self):
+        return self._addr[0]
+    
+    @property
+    def realname(self):
+        return self._realname
 
     @nick.setter
     def nick(self, nick):
         servlocal = aioircd.servlocal.get()
         servlocal.users[nick] = servlocal.users.pop(self._nick, self)
         self._nick = nick
+
+    @realname.setter
+    def realname(self, realname):
+        self._realname = realname
 
     def can_use_nick(self, nick):
         """ Whether this user is allowed to use ``nick``. """

@@ -73,6 +73,10 @@ class UserState(metaclass=abc.ABCMeta):
     @command
     async def NICK(self, nickname):
         raise ErrUnknownError(self.user, "NICK", "Called while in the wrong state.")
+    
+    @command
+    async def WHO(self, channel):
+        raise ErrUnknownError(self.user, "WHO", "Called while in the wrong state.")
 
     @command
     async def JOIN(self, channels):
@@ -136,6 +140,7 @@ class ConnectedState(UserState):
     @command
     async def USER(self, username, _zero, _star, realname):
         self.has_user = True
+        self.user.realname = realname
         if self.has_user and self.has_nick:
             await self.register()
 
@@ -313,6 +318,51 @@ class RegisteredState(UserState):
                 f":{self.user.nick} PRIVMSG {target} :{text}",
                 skipusers={self.user}
             )
+
+    @command
+    async def WHO(self, target="*"):
+        servlocal = aioircd.servlocal.get()
+        host = servlocal.host
+        requester = self.user.nick
+    
+        def match(user, target):
+            if target == "*" or target == "":
+                return True
+            if target.startswith("#"):
+                return user in servlocal.channels.get(target, set()).users
+            return target.lower() in user.nick.lower()
+    
+        users = set()
+    
+        # Channel WHO
+        if target.startswith("#"):
+            chan = servlocal.channels.get(target)
+            if chan:
+                users = chan.users
+    
+        # Global / nick WHO
+        else:
+            for chan in servlocal.channels.values():
+                users.update(chan.users)
+    
+            users = [u for u in users if target == "*" or target.lower() in u.nick.lower()]
+    
+        # Send WHO replies
+        for user in users:
+            await self.user.send(
+                f":{host} 352 {requester} "
+                f"{target} "
+                f"~{user.nick} "
+                f"{user.host} "
+                f"{host} "
+                f"{user.nick} "
+                f"H :0 {user.realname}"
+            )
+    
+        # End of WHO list
+        await self.user.send(
+            f":{host} 315 {requester} {target} :End of /WHO list."
+        )
 
 class QuitState(UserState):
     """ The user sent the QUIT command, no more message should be processed """
