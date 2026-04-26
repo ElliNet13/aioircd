@@ -77,6 +77,10 @@ class UserState(metaclass=abc.ABCMeta):
     @command
     async def WHO(self, channel):
         raise ErrUnknownError(self.user, "WHO", "Called while in the wrong state.")
+    
+    @command
+    async def WHOIS(self, channel):
+        raise ErrUnknownError(self.user, "WHOIS", "Called while in the wrong state.")
 
     @command
     async def JOIN(self, channels):
@@ -117,7 +121,7 @@ class PasswordState(UserState):
     async def PASS(self, password):
         servlocal = aioircd.servlocal.get()
         if password != servlocal.pwd:
-            logger.log(SecurityLevel, "Invalid password for %s", self.user)
+            logger.log(aioircd.SECURITY, "Invalid password for %s", self.user)
             raise ErrPasswdMismatch()
 
         self.user.state = ConnectedState(self.user)
@@ -362,6 +366,33 @@ class RegisteredState(UserState):
         # End of WHO list
         await self.user.send(
             f":{host} 315 {requester} {target} :End of /WHO list."
+        )
+
+    @command
+    async def WHOIS(self, target):
+        servlocal = aioircd.servlocal.get()
+        host = servlocal.host
+        requester = self.user.nick
+
+        user = servlocal.users.get(target)
+        if not user:
+            raise ErrNoSuchNick(target)
+
+        await self.user.send(
+            f":{host} 311 {requester} {target} ~{user.nick} {user.host} {host} :{user.realname}"
+        )
+        await self.user.send(
+            f":{host} 312 {requester} {target} {host} :aioircd"
+        )
+
+        channels = ' '.join(sorted(chan.name for chan in user.channels))
+        if channels:
+            await self.user.send(
+                f":{host} 319 {requester} {target} :{channels}"
+            )
+
+        await self.user.send(
+            f":{host} 318 {requester} {target} :End of /WHOIS list."
         )
 
 class QuitState(UserState):
