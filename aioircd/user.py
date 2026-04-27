@@ -106,7 +106,7 @@ class User:
         while True:
             with trio.move_on_after(cfg.TIMEOUT - cfg.PING_TIMEOUT) as self._ping_timer:
                 await trio.sleep_forever()
-            await self.send('PING', log=logger.isEnabledFor(logging.DEBUG))
+            await self.send(f'PING {uuid.uuid4().hex}', log=logger.isEnabledFor(logging.DEBUG))
 
     async def serve(self):
         """
