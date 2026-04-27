@@ -181,7 +181,6 @@ class ConnectedState(UserState):
                 )
         elif subcommand == 'END':
             self.cap_ended = True
-            await self.user.send(f":{host} CAP * END")
             if self.has_user and self.has_nick:
                 await self.register()
         else:
