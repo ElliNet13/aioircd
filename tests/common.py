@@ -15,7 +15,8 @@ from aioircd.states import ConnectedState, RegisteredState
 
 
 _latin_alpha = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
-def _unique_id_gen(alphabet=_latin_alpha, base_length=1):
+from typing import Iterator
+def _unique_id_gen(alphabet=_latin_alpha, base_length=1) -> Iterator:
     for r in itertools.count(base_length):
         for comb in itertools.combinations_with_replacement(alphabet, r):
             yield ''.join(comb)
@@ -36,18 +37,18 @@ DEFAULT_CONFIG = {
 
 _users = []
 class FakeUser(aioircd.user.User):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self._test_stream = None
         _users.append(self)
 
-    async def usend(self, messages):
+    async def usend(self, messages) -> None:
         """ Send many messages from the user to the server. """
         if isinstance(messages, str):
             messages = [messages]
         await self._test_stream.send_all(b"".join(f"{msg}\r\n".encode() for msg in messages))
 
-    async def urecv(self):
+    async def urecv(self) -> str:
         """ Receive as many bytes as possible from the server during .1 seconds """
         buffer = b""
         with trio.move_on_after(.1):
@@ -59,7 +60,7 @@ class FakeUser(aioircd.user.User):
         return await waitfor(lambda: type(self.state) is state)
 
 
-async def waitfor(predicate, timeout=.1, sleep=.01):
+async def waitfor(predicate, timeout=.1, sleep=.01) -> bool:
     """ Wait at most ``timeout`` secs for ``predicate()`` be be truthy. """
     with trio.move_on_after(timeout):
         while not predicate():
@@ -69,7 +70,7 @@ async def waitfor(predicate, timeout=.1, sleep=.01):
 
 
 class AsyncTestCase(unittest.TestCase):
-    def __init_subclass__(cls, /, *args, **kwargs):
+    def __init_subclass__(cls, /, *args, **kwargs) -> None:
         for fname, corofunc in inspect.getmembers(cls, inspect.iscoroutinefunction):
             if not fname.startswith('atest_'):
                 continue
@@ -90,25 +91,25 @@ class TestIRC(unittest.TestCase):
     config = {}
 
     @classmethod
-    def setUpClass(cls):
+    def setUpClass(cls) -> None:
         aioircd.user.User = aioircd.server.User = FakeUser
         cfg.__dict__.update(dict(DEFAULT_CONFIG, **cls.config))
         cls._server = Server(cfg.HOST, cfg.ADDR, cfg.PORT, cfg.PASS)
         cls._servlocal = ServLocal(cfg.HOST, cfg.PASS, {}, {})
 
     @classmethod
-    def tearDownClass(cls):
+    def tearDownClass(cls) -> None:
         aioircd.user.User = aioircd.server.User = RealUser
 
-    def setUp(self):
+    def setUp(self) -> None:
         self._users = _users
         self._users.clear()
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         for user in self._users:
             trio.run(user._test_stream.aclose)
 
-    async def start_server(self, nursery):
+    async def start_server(self, nursery) -> None:
         aioircd.servlocal.set(self._servlocal)
         self._listeners = await nursery.start(functools.partial(
             trio.serve_tcp, self._server.handle, 0, host=self._server.addr))
@@ -121,7 +122,7 @@ class TestIRC(unittest.TestCase):
         user._test_stream = stream
         return user
 
-    async def register(self, user, nickname, username=None, realname=None):
+    async def register(self, user, nickname, username=None, realname=None) -> None:
         if username is None:
             username = f'john-doe-{newid()}'
         if realname is None:

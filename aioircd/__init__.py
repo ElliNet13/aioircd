@@ -25,7 +25,7 @@ import aioircd.states
 import aioircd.user
 
 
-def update_status():
+def update_status() -> None:
     sl = servlocal.get()
     aioircd.sdnotify.status(
         f"Listening on {cfg.ADDR} ({cfg.HOST}) port {cfg.PORT}. "

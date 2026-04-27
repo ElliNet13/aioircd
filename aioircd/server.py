@@ -2,6 +2,7 @@ import dataclasses
 import logging
 import signal
 import trio
+from typing import Any, Dict, Optional
 
 import aioircd
 from aioircd import sdnotify
@@ -13,13 +14,13 @@ logger = logging.getLogger(__name__)
 
 
 class Server:
-    def __init__(self, host, addr, port, pwd):
+    def __init__(self, host: str, addr: str, port: int, pwd: Optional[str]) -> None:
         self.host = host
         self.addr = addr
         self.port = port
         self.pwd = pwd
 
-    async def handle(self, stream):
+    async def handle(self, stream: trio.abc.Stream) -> None:
         servlocal = aioircd.servlocal.get()
         async with trio.open_nursery() as nursery:
             user = User(stream, nursery)
@@ -38,11 +39,11 @@ class Server:
 
         logger.info("Connection with %s closed.", user)
 
-    def started(self, _listeners):
+    def started(self, _listeners: Any) -> None:
         sdnotify.ready()
         aioircd.update_status()
 
-    async def _onterm(self):
+    async def _onterm(self) -> None:
         with trio.open_signal_receiver(signal.SIGTERM, signal.SIGINT) as signal_aiter:
             async for _ in signal_aiter:
                 if self._nursery.cancel_scope.cancel_called:
@@ -51,7 +52,7 @@ class Server:
                 sdnotify.status("Terminating connections...")
                 self._nursery.cancel_scope.cancel()
 
-    async def serve(self):
+    async def serve(self) -> None:
         aioircd.servlocal.set(ServLocal(self.host, self.pwd, {}, {}))
         async with trio.open_nursery() as self._nursery:
             self._nursery.start_soon(self._onterm)
@@ -63,10 +64,10 @@ class Server:
 class ServLocal:
     host: str
     pwd: str  # password, "pass" is a reserved keyword
-    users: dict
-    channels: dict
+    users: Dict[str, User]
+    channels: Dict[str, "aioircd.channel.Channel"]
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return (
             f'{self.__name__}('
             f'host: {self.host!r}, '

@@ -3,7 +3,7 @@ import logging
 import re
 import trio
 import uuid
-from typing import Union, List
+from typing import List, Optional, Set, Tuple, Union
 
 import aioircd
 from aioircd.config import config as cfg
@@ -40,20 +40,20 @@ _safenets = [
 
 
 class User:
-    def __init__(self, stream, nursery):
+    def __init__(self, stream: trio.abc.Stream, nursery: trio.Nursery) -> None:
         servlocal = aioircd.servlocal.get()
         self.stream = stream
         self._nursery = nursery
-        self._nick = None
-        self._addr = stream.socket.getpeername()
-        self._realname = None
+        self._nick: Optional[str] = None
+        self._addr: Tuple[str, int, ...] = stream.socket.getpeername()
+        self._realname: Optional[str] = None
         self.state = None
         self.state = (PasswordState if servlocal.pwd else ConnectedState)(self)
         self.channels = set()
         self._ping_timer = trio.CancelScope()  # dummy
         self._send_lock = trio.StrictFIFOLock()
 
-    def __str__(self):
+    def __str__(self) -> str:
         if self.nick:
             return self.nick
 
@@ -63,32 +63,32 @@ class User:
         return f'{ip}:{port}'
 
     @property
-    def nick(self):
+    def nick(self) -> Optional[str]:
         return self._nick
     
     @property
-    def addr(self):
+    def addr(self) -> Tuple[str, int, ...]:
         return self._addr
     
     @property
-    def host(self):
+    def host(self) -> str:
         return self._addr[0]
     
     @property
-    def realname(self):
+    def realname(self) -> Optional[str]:
         return self._realname
 
     @nick.setter
-    def nick(self, nick):
+    def nick(self, nick: str) -> None:
         servlocal = aioircd.servlocal.get()
         servlocal.users[nick] = servlocal.users.pop(self._nick, self)
         self._nick = nick
 
     @realname.setter
-    def realname(self, realname):
+    def realname(self, realname: str) -> None:
         self._realname = realname
 
-    def can_use_nick(self, nick):
+    def can_use_nick(self, nick: str) -> bool:
         """ Whether this user is allowed to use ``nick``. """
         if nick not in _unsafe_nicks:
             return True
@@ -96,7 +96,7 @@ class User:
         ip = ipaddress.ip_address(self._addr[0])
         return any(ip in net for net in _safenets)
 
-    async def ping_forever(self):
+    async def ping_forever(self) -> None:
         """
         If the user did not send any message for some time, send him a
         PING message that he should answer ASAP with a PONG message. If
@@ -108,7 +108,7 @@ class User:
                 await trio.sleep_forever()
             await self.send(f'PING {uuid.uuid4().hex}', log=logger.isEnabledFor(logging.DEBUG))
 
-    async def serve(self):
+    async def serve(self) -> None:
         """
         Read for messages on the user socket, parse them and dispatch
         each message to the current's user state.
@@ -165,7 +165,7 @@ class User:
                         args[0], self, exc.code)
                     await self.send(exc.args[0])
 
-    async def terminate(self, kick_msg="Connection terminated by host"):
+    async def terminate(self, kick_msg: str = "Connection terminated by host") -> None:
         """
         Terminate the connection with this user by closing the
         underlying socket and cancelling the user's nursery effectively
@@ -179,7 +179,12 @@ class User:
         await self.stream.aclose()
         self._nursery.cancel_scope.cancel()
 
-    async def send(self, messages: Union[str, List[str]], log=True, skipusers=None):
+    async def send(
+        self,
+        messages: Union[str, List[str]],
+        log: bool = True,
+        skipusers: Optional[Set["aioircd.user.User"]] = None,
+    ) -> None:
         """ Send many messages to the user. """
         if isinstance(messages, str):
             messages = [messages]

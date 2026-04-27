@@ -10,10 +10,13 @@ import logging
 import re
 import textwrap
 import trio
+from typing import Any, Callable, Dict, List, Optional, Set, TypeVar
 
 import aioircd
 from aioircd.channel import Channel
 from aioircd.exceptions import *
+
+FuncType = TypeVar('FuncType', bound=Callable[..., Any])
 
 
 logger = logging.getLogger(__name__)
@@ -21,21 +24,21 @@ nick_re = re.compile(r"[a-zA-Z][a-zA-Z0-9\-_]{1,15}")
 chan_re = re.compile(r"[&#][a-zA-Z0-9\-_]{1,49}")
 
 
-def command(func):
+def command(func: FuncType) -> FuncType:
     """ Denote the function can be triggered by an IRC message """
     func.command = True
     return func
 
 
 class UserState(metaclass=abc.ABCMeta):
-    def __init__(self, user):
+    def __init__(self, user: "aioircd.user.User") -> None:
         logger.debug("state of user %s changed: %s -> %s", user, user.state, self)
         self.user = user
 
-    def __str__(self):
+    def __str__(self) -> str:
         return type(self).__name__[:-5]
 
-    async def dispatch(self, cmd, *params):
+    async def dispatch(self, cmd: str, *params: str) -> None:
         logger.debug('Dispatch to %s: %s', cmd, params)
         meth = getattr(self, cmd, None)
         if not meth or not getattr(meth, 'command', False):
@@ -54,16 +57,16 @@ class UserState(metaclass=abc.ABCMeta):
         await meth(*params)
 
     @command
-    async def PING(self, token):
+    async def PING(self, token: str) -> None:
         host = aioircd.servlocal.get().host
         await self.user.send(f":{host} PONG {host} {token}", log=logger.isEnabledFor(logging.DEBUG))
 
     @command
-    async def PONG(self, token=None):
+    async def PONG(self, token: Optional[str] = None) -> None:
         pass  # ignored
 
     @command
-    async def CAP(self, subcommand, *params):
+    async def CAP(self, subcommand: str, *params: str) -> None:
         host = aioircd.servlocal.get().host
         subcommand = subcommand.upper()
 
@@ -99,51 +102,51 @@ class UserState(metaclass=abc.ABCMeta):
             raise ErrUnknownError(self.user, "CAP", f"Unknown CAP subcommand {subcommand}.")
 
     @command
-    async def USER(self, username, _zero, _star, realname):
+    async def USER(self, username: str, _zero: str, _star: str, realname: str) -> None:
         raise ErrUnknownError(self.user, "USER", "Called while in the wrong state.")
 
     @command
-    async def PASS(self, password):
+    async def PASS(self, password: str) -> None:
         raise ErrUnknownError(self.user, "PASS", "Called while in the wrong state.")
 
     @command
-    async def NICK(self, nickname):
+    async def NICK(self, nickname: str) -> None:
         raise ErrUnknownError(self.user, "NICK", "Called while in the wrong state.")
     
     @command
-    async def WHO(self, channel):
+    async def WHO(self, channel: str) -> None:
         raise ErrUnknownError(self.user, "WHO", "Called while in the wrong state.")
     
     @command
-    async def WHOIS(self, channel):
+    async def WHOIS(self, channel: str) -> None:
         raise ErrUnknownError(self.user, "WHOIS", "Called while in the wrong state.")
 
     @command
-    async def JOIN(self, channels):
+    async def JOIN(self, channels: str) -> None:
         raise ErrUnknownError(self.user, "JOIN", "Called while in the wrong state.")
 
     @command
-    async def PART(self, channels, reason=None):
+    async def PART(self, channels: str, reason: Optional[str] = None) -> None:
         raise ErrUnknownError(self.user, "PART", "Called while in the wrong state.")
 
     @command
-    async def NAMES(self, channel):
+    async def NAMES(self, channel: str) -> None:
         raise ErrUnknownError(self.user, "NAMES", "Called while in the wrong state.")
 
     @command
-    async def LIST(self):
+    async def LIST(self) -> None:
         raise ErrUnknownError(self.user, "LIST", "Called while in the wrong state.")
 
     @command
-    async def PRIVMSG(self, args):
+    async def PRIVMSG(self, args: str) -> None:
         raise ErrUnknownError(self.user, "PRIVMSG", "Called while in the wrong state.")
     
     @command
-    async def MODE(self, args):
+    async def MODE(self, args: str) -> None:
         raise ErrUnknownError(self.user, "MODE", "Called while in the wrong state.")
 
     @command
-    async def QUIT(self, reason="", *, kick=False):
+    async def QUIT(self, reason: str = "", *, kick: bool = False) -> None:
         servlocal = aioircd.servlocal.get()
         if not kick:
             reason = 'Quit: ' + reason
@@ -158,7 +161,7 @@ class UserState(metaclass=abc.ABCMeta):
 
 class PasswordState(UserState):
     @command
-    async def PASS(self, password):
+    async def PASS(self, password: str) -> None:
         servlocal = aioircd.servlocal.get()
         if password != servlocal.pwd:
             logger.log(aioircd.SECURITY, "Invalid password for %s", self.user)
@@ -172,24 +175,24 @@ class ConnectedState(UserState):
     The user is just connected, he must register via the NICK command
     first before going on.
     """
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.has_nick = False
         self.has_user = False
 
     @command
-    async def PASS(self, password):
+    async def PASS(self, password: str) -> None:
         raise ErrAlreadyRegistred()
 
     @command
-    async def USER(self, username, _zero, _star, realname):
+    async def USER(self, username: str, _zero: str, _star: str, realname: str) -> None:
         self.has_user = True
         self.user.realname = realname
         if self.has_user and self.has_nick:
             await self.register()
 
     @command
-    async def NICK(self, nickname):
+    async def NICK(self, nickname: str) -> None:
         servlocal = aioircd.servlocal.get()
         if nickname in servlocal.users:
             raise ErrNicknameInUse(nickname)
@@ -204,7 +207,7 @@ class ConnectedState(UserState):
         if self.has_user and self.has_nick:
             await self.register()
 
-    async def register(self):
+    async def register(self) -> None:
         servlocal = aioircd.servlocal.get()
         self.user.state = RegisteredState(self.user)
         aioircd.update_status()
@@ -237,15 +240,15 @@ class RegisteredState(UserState):
     """
 
     @command
-    async def PASS(self, password):
+    async def PASS(self, password: str) -> None:
         raise ErrAlreadyRegistred()
 
     @command
-    async def USER(self, username, _zero, _star, realname):
+    async def USER(self, username: str, _zero: str, _star: str, realname: str) -> None:
         raise ErrAlreadyRegistred()
 
     @command
-    async def NICK(self, nickname):
+    async def NICK(self, nickname: str) -> None:
         servlocal = aioircd.servlocal.get()
 
         if nickname in servlocal.users:
@@ -261,7 +264,7 @@ class RegisteredState(UserState):
         self.user.nick = nickname
 
     @command
-    async def JOIN(self, channels):
+    async def JOIN(self, channels: str) -> None:
         servlocal = aioircd.servlocal.get()
 
         for channel in channels.split(','):
@@ -285,7 +288,7 @@ class RegisteredState(UserState):
             await self.NAMES(channel)
 
     @command
-    async def PART(self, channels, reason=None):
+    async def PART(self, channels: str, reason: Optional[str] = None) -> None:
         servlocal = aioircd.servlocal.get()
 
         for channel in channels.split(','):
@@ -310,7 +313,7 @@ class RegisteredState(UserState):
                 await chan.send(f":{self.user.nick} PART {channel}")
 
     @command
-    async def NAMES(self, channel):
+    async def NAMES(self, channel: str) -> None:
         servlocal = aioircd.servlocal.get()
         chan = servlocal.channels.get(channel)
         host = servlocal.host
@@ -329,7 +332,7 @@ class RegisteredState(UserState):
         await self.user.send(f":{host} 366 {nick} {chan} :End of /NAMES list.")
             
     @command
-    async def LIST(self):
+    async def LIST(self) -> None:
         servlocal = aioircd.servlocal.get()
         host = servlocal.host
         nick = self.user.nick
@@ -344,7 +347,7 @@ class RegisteredState(UserState):
         ])
 
     @command
-    async def PRIVMSG(self, targets, text):
+    async def PRIVMSG(self, targets: str, text: str) -> None:
         servlocal = aioircd.servlocal.get()
 
         for target in targets.split(','):
@@ -364,12 +367,12 @@ class RegisteredState(UserState):
             )
 
     @command
-    async def WHO(self, target="*"):
+    async def WHO(self, target: str = "*") -> None:
         servlocal = aioircd.servlocal.get()
         host = servlocal.host
         requester = self.user.nick
     
-        def match(user, target):
+        def match(user: "aioircd.user.User", target: str) -> bool:
             if target == "*" or target == "":
                 return True
             if target.startswith("#"):
@@ -409,7 +412,7 @@ class RegisteredState(UserState):
         )
 
     @command
-    async def WHOIS(self, target):
+    async def WHOIS(self, target: str) -> None:
         servlocal = aioircd.servlocal.get()
         host = servlocal.host
         requester = self.user.nick
@@ -436,7 +439,7 @@ class RegisteredState(UserState):
         )
 
     @command
-    async def MODE(self, target=None, *params):
+    async def MODE(self, target: Optional[str] = None, *params: str) -> None:
         servlocal = aioircd.servlocal.get()
         host = servlocal.host
         nick = self.user.nick
@@ -472,19 +475,19 @@ class RegisteredState(UserState):
 
 class QuitState(UserState):
     """ The user sent the QUIT command, no more message should be processed """
-    def __init__(self, user):
+    def __init__(self, user: "aioircd.user.User") -> None:
         super().__init__(user)
         user.nick = None
         aioircd.update_status()
 
     @command
-    async def PING(self, server1=None, server2=None):
+    async def PING(self, server1: Optional[str] = None, server2: Optional[str] = None) -> None:
         raise ErrUnknownError(self.user, "PING", "Called while in the wrong state.")
 
     @command
-    async def PING(self, server1=None, server2=None):
+    async def PONG(self, server1: Optional[str] = None, server2: Optional[str] = None) -> None:
         raise ErrUnknownError(self.user, "PONG", "Called while in the wrong state.")
 
     @command
-    def QUIT(self, args):
+    def QUIT(self, args: str) -> None:
         raise ErrUnknownError(self.user, "QUIT", "Called while in the wrong state.")

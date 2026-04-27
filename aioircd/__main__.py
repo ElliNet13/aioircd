@@ -24,12 +24,12 @@ class ColoredFormatter(logging.Formatter):
         aioircd.SECURITY: (31, 49),  # red
         logging.CRITICAL: (37, 41),  # white fg, red bg
     }
-    def format(self, record):
+    def format(self, record: logging.LogRecord) -> str:
         fg, bg = type(self).colors.get(record.levelno, (32, 49))
         record.levelname = f'\033[1;{fg}m\033[1;{bg}m{record.levelname}\033[0m'
         return super().format(record)
 
-def main():
+def main() -> None:
     stderr = logging.StreamHandler()
     stderr.formatter = (
         ColoredFormatter('%(asctime)s [%(levelname)s] %(message)s')

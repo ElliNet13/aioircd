@@ -6,6 +6,7 @@ __ALL__ = [
 ]
 
 import aioircd
+from typing import Any
 
 class Disconnect(Exception):
     pass
@@ -16,11 +17,11 @@ class IRCException(Exception):
 
     They are excepted by dispatch() and forwarded to the user.
     """
-    def __init__(self, *args):
+    def __init__(self, *args: Any) -> None:
         super().__init__(type(self).format(*args))
 
     @classmethod
-    def format(cls, *args):
+    def format(cls, *args: Any) -> str:
         return ":{host} {code} {error}".format(
             host=aioircd.servlocal.get().host,
             code=cls.code,

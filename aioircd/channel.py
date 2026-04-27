@@ -1,7 +1,7 @@
 import logging
 import trio
 from functools import partial
-from typing import Union, List, Set
+from typing import List, Set, Union
 
 import aioircd
 
@@ -27,7 +27,7 @@ class Channel:
                 the channel name.
         """
         self._name = name
-        self.users = set()
+        self.users: Set["aioircd.user.User"] = set()
 
     def __str__(self) -> str:
         """
@@ -39,7 +39,7 @@ class Channel:
         return self._name
 
     @property
-    def name(self):
+    def name(self) -> str:
         """
         Getter for private attributes channel name.
 
@@ -58,7 +58,11 @@ class Channel:
         for message in messages:
             logger.log(aioircd.IO, "send to %s: %s", self, message)
 
-    async def send(self, messages: Union[str, List[str]], skipusers: Set["aioircd.user.User"] = set()) -> None:
+    async def send(
+        self,
+        messages: Union[str, List[str]],
+        skipusers: Set["aioircd.user.User"] = set(),
+    ) -> None:
         """"
         Send many messages to each user subscribed to this channel.
         

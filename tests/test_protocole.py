@@ -10,7 +10,7 @@ from .common import AsyncTestCase, TestIRC, waitfor
 
 
 class TestProtocole(AsyncTestCase, TestIRC):
-    async def atest_nick_collision(self, nursery):
+    async def atest_nick_collision(self, nursery) -> None:
 
         await self.start_server(nursery)
 
@@ -35,7 +35,7 @@ class TestProtocole(AsyncTestCase, TestIRC):
 
 
 class TestTour(AsyncTestCase, TestIRC):
-     async def atest_who_and_whois(self, nursery):
+     async def atest_who_and_whois(self, nursery) -> None:
         await self.start_server(nursery)
 
         bob = await self.connect_user()
@@ -73,7 +73,7 @@ class TestTour(AsyncTestCase, TestIRC):
             :ip6-localhost 318 whoisbob whoiseve :End of /WHOIS list.\r
             '''))
 
-     async def atest_tour(self, nursery):
+     async def atest_tour(self, nursery) -> None:
         await self.start_server(nursery)
 
         bob = await self.connect_user()

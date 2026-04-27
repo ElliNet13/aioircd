@@ -1,24 +1,24 @@
 import socket
 import os
 
-def notify(payload: bytes):
+def notify(payload: bytes) -> None:
     if _sdsocket:
         _sdsocket.sendall(payload)
 
 
-def ready():
+def ready() -> None:
     notify(b"READY=1")
 
 
-def reloading():
+def reloading() -> None:
     notify(b"RELOADING=1")
 
 
-def stopping():
+def stopping() -> None:
     notify(b"STOPPING=1")
 
 
-def status(line: str):
+def status(line: str) -> None:
     notify(b"STATUS=" + line.encode())
 
 
