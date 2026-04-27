@@ -137,6 +137,10 @@ class UserState(metaclass=abc.ABCMeta):
     @command
     async def PRIVMSG(self, args):
         raise ErrUnknownError(self.user, "PRIVMSG", "Called while in the wrong state.")
+    
+    @command
+    async def MODE(self, args):
+        raise ErrUnknownError(self.user, "MODE", "Called while in the wrong state.")
 
     @command
     async def QUIT(self, reason="", *, kick=False):
@@ -429,6 +433,41 @@ class RegisteredState(UserState):
 
         await self.user.send(
             f":{host} 318 {requester} {target} :End of /WHOIS list."
+        )
+
+    @command
+    async def MODE(self, target=None, *params):
+        servlocal = aioircd.servlocal.get()
+        host = servlocal.host
+        nick = self.user.nick
+
+        # Replace IF I add a MODE system
+
+        # User MODE query
+        if not target or target == self.user.nick:
+            await self.user.send(
+                f":{host} 221 {nick} +"
+            )
+            return
+
+        # Channel MODE query
+        if target.startswith("#") or target.startswith("&"):
+            if target not in servlocal.channels:
+                await self.user.send(ErrNoSuchChannel.format(target))
+                return
+
+            # Placeholder: pretend all channels are "+nt"
+            await self.user.send(
+                f":{host} 324 {nick} {target} +nt"
+            )
+            await self.user.send(
+                f":{host} 329 {nick} {target} 0"
+            )
+            return
+
+        # Unknown target (nick etc.)
+        await self.user.send(
+            ErrNoSuchNick.format(target)
         )
 
 class QuitState(UserState):
