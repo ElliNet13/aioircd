@@ -83,7 +83,7 @@ class UserState(metaclass=abc.ABCMeta):
             requested = set(params)
 
             supported = CAPS
-            unknown = requested - supported
+            unknown = requested.difference(supported)
 
             if unknown:
                 await self.user.send(
