@@ -65,41 +65,6 @@ class UserState(metaclass=abc.ABCMeta):
     async def PONG(self, token: Optional[str] = None) -> None:
         pass  # ignored
 
-    @command
-    async def CAP(self, subcommand: str, *params: str) -> None:
-        host = aioircd.servlocal.get().host
-        subcommand = subcommand.upper()
-
-        CAPS = [
-            "away-notify",
-            "cap-notify",
-            "multi-prefix",
-            "chghost",
-        ]
-        caps = " ".join(CAPS)
-
-        if subcommand == 'LS':
-            await self.user.send(f":{host} CAP * LS :{caps}")
-        elif subcommand == 'LIST':
-            await self.user.send(f":{host} CAP * LIST :{caps}")
-        elif subcommand == 'REQ':
-            requested = set(params)
-
-            supported = CAPS
-            unknown = requested.difference(supported)
-
-            if unknown:
-                await self.user.send(
-                    f":{host} CAP * NAK :{' '.join(unknown)}"
-                )
-            else:
-                await self.user.send(
-                    f":{host} CAP * ACK :{' '.join(requested)}"
-                )
-        elif subcommand == 'END':
-            await self.user.send(f":{host} CAP * END")
-        else:
-            raise ErrUnknownError(self.user, "CAP", f"Unknown CAP subcommand {subcommand}.")
 
     @command
     async def USER(self, username: str, _zero: str, _star: str, realname: str) -> None:
@@ -179,6 +144,48 @@ class ConnectedState(UserState):
         super().__init__(*args, **kwargs)
         self.has_nick = False
         self.has_user = False
+        self.cap_ended = False
+        self.cap_started = False
+
+    @command
+    async def CAP(self, subcommand: str, *params: str) -> None:
+        host = aioircd.servlocal.get().host
+        subcommand = subcommand.upper()
+        self.cap_started = True
+
+        CAPS = [
+            "away-notify",
+            "cap-notify",
+            "multi-prefix",
+            "chghost",
+        ]
+        caps = " ".join(CAPS)
+
+        if subcommand == 'LS':
+            await self.user.send(f":{host} CAP * LS :{caps}")
+        elif subcommand == 'LIST':
+            await self.user.send(f":{host} CAP * LIST :{caps}")
+        elif subcommand == 'REQ':
+            requested = set(params[-1].split())
+
+            supported = CAPS
+            unknown = requested.difference(supported)
+
+            if unknown:
+                await self.user.send(
+                    f":{host} CAP * NAK :{' '.join(unknown)}"
+                )
+            else:
+                await self.user.send(
+                    f":{host} CAP * ACK :{' '.join(requested)}"
+                )
+        elif subcommand == 'END':
+            self.cap_ended = True
+            await self.user.send(f":{host} CAP * END")
+            if self.has_user and self.has_nick:
+                await self.register()
+        else:
+            raise ErrUnknownError(self.user, "CAP", f"Unknown CAP subcommand {subcommand}.")
 
     @command
     async def PASS(self, password: str) -> None:
@@ -188,7 +195,7 @@ class ConnectedState(UserState):
     async def USER(self, username: str, _zero: str, _star: str, realname: str) -> None:
         self.has_user = True
         self.user.realname = realname
-        if self.has_user and self.has_nick:
+        if self.has_user and self.has_nick and (not self.cap_started or self.cap_ended):
             await self.register()
 
     @command
@@ -204,7 +211,7 @@ class ConnectedState(UserState):
 
         self.user.nick = nickname
         self.has_nick = True
-        if self.has_user and self.has_nick:
+        if self.has_user and self.has_nick and (not self.cap_started or self.cap_ended):
             await self.register()
 
     async def register(self) -> None:
