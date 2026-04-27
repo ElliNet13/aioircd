@@ -175,7 +175,10 @@ class User:
         if type(self.state) != QuitState:
             await self.state.QUIT(f":{kick_msg}".split(' '), kick=True)
         with trio.move_on_after(cfg.PING_TIMEOUT) as cs:
-            await self.stream.send_eof()
+            try:
+                await self.stream.send_eof()
+            except (trio.BrokenResourceError, OSError):
+                pass # client already died
         await self.stream.aclose()
         self._nursery.cancel_scope.cancel()
 
