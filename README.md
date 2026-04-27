@@ -37,12 +37,3 @@ The configuration is done via environment variables, see `--help`:
       TIMEOUT        kick inactive users after x seconds (default: 60)
       PING_TIMEOUT   PING inactive users x seconds before timeout (default: 5)
       LOGLEVEL       logging verbosity (default: WARNING)
-
-### Scope
-
-We try to both keep only implement the most important commands and to
-make sure all modern IRC clients are working. If you are having
-troubles using aioircd with your client feel free to open an issue.
-
-Stuff we don't plan to support: server connections, user modes, channel
-modes.
